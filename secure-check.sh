@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 server_address=$1
+healthcheck_url=$2
 
 status=0
 
@@ -10,21 +11,45 @@ set_failure_status() {
 
 check_closed_port() {
     echo "Checking port $1"
-    # TODO: handle timeout
-    return $(timeout 5 telnet "$server_address" $1 < /dev/null 2>&1 | grep -q "Connection refused")
+    nc -z -w5 "$server_address" "$1"
+}
+
+check_url_status() {
+    http_status=$(curl -s -o /dev/null -w "%{http_code}" --max-redirs 5 -L "$1")
+
+    echo "HTTP status $1 $http_status"
+
+    if [[ "$http_status" -eq 200 ]]; then
+        return 0
+    else
+        return 1
+    fi
 }
 
 assert_port_closed() {
-    if ! check_closed_port $1; then
+    check_closed_port "$1"
+
+    if [ $? -eq 0 ]; then
         set_failure_status
         echo "Assertion failed: port $1 must be closed" >&2
     fi
 }
 
 assert_port_open() {
-    if check_closed_port $1; then
+    check_closed_port "$1"
+
+    if [ $? -ne 0 ]; then
         set_failure_status
         echo "Assertion failed: port $1 must be closed" >&2
+    fi
+}
+
+assert_url_status() {
+    check_url_status "$1"
+
+    if [[ $? -ne 0 ]]; then
+        echo "Assertion failed: unsuccessful $1 status $http_status" >&2
+        set_failure_status
     fi
 }
 
@@ -35,13 +60,9 @@ fi
 
 echo "Running checks on $server_address"
 
-http_status=$(curl -s -o /dev/null -w "%{http_code}" --max-redirs 5 -L "$server_address")
-echo "HTTP status is $http_status"
+assert_url_status "$server_address"
+assert_url_status "$server_address$healthcheck_url"
 
-if [[ "$http_status" -ne 200 ]]; then
-    echo "Assertion failed: unsuccessful HTTP status $http_status" >&2
-    set_failure_status
-fi
 
 # TODO: ports in env file
 
