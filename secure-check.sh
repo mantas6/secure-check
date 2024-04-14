@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 
-server_address=$1
-healthcheck_url=$2
+# Arguments
+server_address="$1"
+healthcheck_url="$2"
+ssh_port="$3"
 
 status=0
 
@@ -53,6 +55,21 @@ assert_url_status() {
     fi
 }
 
+assert_ssh() {
+    ssh_result=$(timeout 5 ssh "$1" -p "$2" \
+        -o LogLevel=ERROR \
+        -o PubkeyAuthentication=no \
+        -o StrictHostKeyChecking=no \
+        -o UserKnownHostsFile=/dev/null 2>&1)
+
+    if [[ "$ssh_result" =~ "Permission denied" ]]; then
+        echo "SSH OK $ssh_result"
+    else
+        set_failure_status
+        echo "SSH attempt assertion failed $ssh_result"
+    fi
+}
+
 if [ -z "$server_address" ]; then
     echo "Error: Server address is not provided" >&2
     exit 1
@@ -83,6 +100,8 @@ assert_port_closed 8000
 # HTTP/HTTPS
 assert_port_open 80
 assert_port_open 443
+
+assert_ssh "$server_address" "$ssh_port"
 
 if [ "$status" -eq 0 ]; then
     echo "All checks are successful"
