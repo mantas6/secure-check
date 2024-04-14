@@ -1,11 +1,20 @@
 #!/usr/bin/env bash
 
 # Arguments
-server_address="$1"
-healthcheck_url="$2"
-ssh_port="$3"
+server_address=""
+healthcheck_url=""
+ssh_port=""
 
 status=0
+
+while getopts ":h:s:a:" opt; do
+  case $opt in
+    h) healthcheck_url="$OPTARG";;
+    s) ssh_port="$OPTARG";;
+    a) server_address="$OPTARG";;
+    \?) echo "Invalid option -$OPTARG" >&2; exit 1;;
+  esac
+done
 
 set_failure_status() {
     status=1
@@ -83,6 +92,9 @@ if [ -n "$healthcheck_url" ]; then
     assert_url_status "$server_address$healthcheck_url"
 fi
 
+if [ -n "$ssh_port" ]; then
+    assert_ssh "$server_address" "$ssh_port"
+fi
 
 # TODO: ports in env file
 #
@@ -100,8 +112,6 @@ assert_port_closed 8000
 # HTTP/HTTPS
 assert_port_open 80
 assert_port_open 443
-
-assert_ssh "$server_address" "$ssh_port"
 
 if [ "$status" -eq 0 ]; then
     echo "All checks are successful"
