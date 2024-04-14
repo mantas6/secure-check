@@ -61,11 +61,15 @@ fi
 echo "Running checks on $server_address"
 
 assert_url_status "$server_address"
-assert_url_status "$server_address$healthcheck_url"
+
+if [ -n "$healthcheck_url" ]; then
+    assert_url_status "$server_address$healthcheck_url"
+fi
 
 
 # TODO: ports in env file
-
+#
+# SSH
 assert_port_closed 22
 
 # Redis
