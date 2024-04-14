@@ -90,10 +90,15 @@ assert_url_status "$server_address"
 
 if [ -n "$healthcheck_url" ]; then
     assert_url_status "$server_address$healthcheck_url"
+else
+    echo "Warning: Healthcheck assertion is skipped"
 fi
 
 if [ -n "$ssh_port" ]; then
+    assert_port_open "$ssh_port"
     assert_ssh "$server_address" "$ssh_port"
+else
+    echo "Warning: SSH assertion is skipped"
 fi
 
 # TODO: ports in env file
