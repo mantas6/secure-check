@@ -7,14 +7,6 @@ ssh_port=""
 
 status=0
 
-while getopts ":h:s:a:" opt; do
-  case $opt in
-    h) healthcheck_url="$OPTARG";;
-    s) ssh_port="$OPTARG";;
-    a) server_address="$OPTARG";;
-    \?) echo "Invalid option -$OPTARG" >&2; exit 1;;
-  esac
-done
 
 set_failure_status() {
     status=1
@@ -79,44 +71,45 @@ assert_ssh() {
     fi
 }
 
+options=$(getopt -l "host:,assert-ssh:,assert-url:,assert-port-open:,assert-port-closed:" -o "h:s:c:p:w:" -a -- "$@")
+eval set -- "$options"
+
+while true
+do
+    case $1 in
+        -h|--host) 
+            shift
+            server_address=$1
+            ;;
+        -s|--assert-ssh)
+            shift
+            assert_port_open "$1"
+            assert_ssh "$server_address" "$1"
+            ;;
+        -c|--assert-url)
+            shift
+            assert_url_status "$server_address$1"
+            ;;
+        -p|--assert-port-open)
+            shift
+            assert_port_open "$1"
+            ;;
+        -w|--assert-port-closed)
+            shift
+            assert_port_closed "$1"
+            ;;
+        --)
+            shift
+            break;;
+    esac
+    shift
+done
+
+
 if [ -z "$server_address" ]; then
     echo "Error: Server address is not provided" >&2
     exit 1
 fi
-
-echo "Running checks on $server_address"
-
-assert_url_status "$server_address"
-
-if [ -n "$healthcheck_url" ]; then
-    assert_url_status "$server_address$healthcheck_url"
-else
-    echo "Warning: Healthcheck assertion is skipped"
-fi
-
-if [ -n "$ssh_port" ]; then
-    assert_port_open "$ssh_port"
-    assert_ssh "$server_address" "$ssh_port"
-else
-    echo "Warning: SSH assertion is skipped"
-fi
-
-# TODO: ports in env file
-#
-# SSH
-assert_port_closed 22
-
-# Redis
-assert_port_closed 6379
-# MySQL
-assert_port_closed 3306
-
-# Laravel Octane
-assert_port_closed 8000
-
-# HTTP/HTTPS
-assert_port_open 80
-assert_port_open 443
 
 if [ "$status" -eq 0 ]; then
     echo "All checks are successful"
